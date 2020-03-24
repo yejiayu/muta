@@ -4,8 +4,11 @@ use metadata::MetadataService;
 use muta::MutaBuilder;
 use protocol::traits::{Service, ServiceMapping, ServiceSDK};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+use runtime_wasm::WasmRuntime;
 
 struct DefaultServiceMapping;
+
+const STORAGE_SERVICE_CODE: &[u8] = include_bytes!("./storage_service.wasm");
 
 impl ServiceMapping for DefaultServiceMapping {
     fn get_service<SDK: 'static + ServiceSDK>(
@@ -16,6 +19,9 @@ impl ServiceMapping for DefaultServiceMapping {
         let service = match name {
             "asset" => Box::new(AssetService::new(sdk)?) as Box<dyn Service>,
             "metadata" => Box::new(MetadataService::new(sdk)?) as Box<dyn Service>,
+            "wasm-storage" => {
+                Box::new(WasmRuntime::new(sdk, STORAGE_SERVICE_CODE)) as Box<dyn Service>
+            }
             _ => {
                 return Err(MappingError::NotFoundService {
                     service: name.to_owned(),

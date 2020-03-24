@@ -35,8 +35,9 @@ toml = "0.5"
 tokio = { version = "0.2", features = ["macros", "rt-core", "rt-util", "signal", "time"]}
 
 [dev-dependencies]
-asset = { path = "built-in-services/asset"}
-metadata = { path = "built-in-services/metadata"}
+asset = { path = "built-in-services/asset" }
+metadata = { path = "built-in-services/metadata" }
+runtime-wasm = { path = "runtime/wasm" }
 
 [workspace]
 members = [
@@ -60,6 +61,8 @@ members = [
   "framework",
   "built-in-services/asset",
   "built-in-services/metadata",
+
+  "runtime/wasm",
 
   "protocol",
 ]

@@ -1,6 +1,8 @@
+use serde::Serialize;
+
 use crate::types::{Hash, MerkleRoot};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct Event {
     pub service: String,
     pub data:    String,

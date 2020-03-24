@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use bytes::Bytes;
 use derive_more::{Display, From};
+use serde::Serialize;
 
 use crate::types::{Address, Event, Hash};
 use crate::{ProtocolError, ProtocolErrorKind, ProtocolResult};
@@ -24,7 +25,7 @@ pub struct ServiceContextParams {
     pub events:          Rc<RefCell<Vec<Event>>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ServiceContext {
     tx_hash:         Option<Hash>,
     nonce:           Option<Hash>,

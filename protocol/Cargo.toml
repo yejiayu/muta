@@ -22,7 +22,7 @@ bytes = { version = "0.5", features = ["serde"] }
 hasher = { version = "0.1", features = ['hash-keccak'] }
 creep = "0.2"
 bincode = "1.2"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 rlp = "0.4"
 cita_trie = "2.0"
