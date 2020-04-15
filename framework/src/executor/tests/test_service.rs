@@ -64,10 +64,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         ctx: ServiceContext,
         payload: TestWritePayload,
     ) -> ServiceResponse<TestWriteResponse> {
-        let payload_str = serde_json::to_string(&payload).unwrap();
-        self.sdk
-            .write(&ctx, None, "test", "test_write", &payload_str);
-        ServiceResponse::<TestWriteResponse>::from_succeed(TestWriteResponse {})
+        self.test_write(ctx, payload)
     }
 
     #[tx_hook_before]

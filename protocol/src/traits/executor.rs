@@ -87,22 +87,3 @@ pub trait Executor {
         request: &TransactionRequest,
     ) -> ProtocolResult<ServiceResponse<String>>;
 }
-
-// `Dispatcher` provides ability to send a call message to other services
-pub trait Dispatcher {
-    fn read(&self, context: ServiceContext) -> ServiceResponse<String>;
-
-    fn write(&self, context: ServiceContext) -> ServiceResponse<String>;
-}
-
-pub struct NoopDispatcher;
-
-impl Dispatcher for NoopDispatcher {
-    fn read(&self, _context: ServiceContext) -> ServiceResponse<String> {
-        unimplemented!()
-    }
-
-    fn write(&self, _context: ServiceContext) -> ServiceResponse<String> {
-        unimplemented!()
-    }
-}

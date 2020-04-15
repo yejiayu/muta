@@ -3,42 +3,67 @@ mod chain_querier;
 pub use chain_querier::{ChainQueryError, DefaultChainQuerier};
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
-use bytes::Bytes;
 use derive_more::{Display, From};
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
-    ChainQuerier, Dispatcher, ServiceResponse, ServiceSDK, ServiceState, StoreArray, StoreBool,
-    StoreMap, StoreString, StoreUint64,
+    ChainQuerier, SDKFactory, ServiceSDK, ServiceState, StoreArray, StoreBool, StoreMap,
+    StoreString, StoreUint64,
 };
-use protocol::types::{Address, Block, Hash, Receipt, ServiceContext, SignedTransaction};
-use protocol::{ProtocolError, ProtocolErrorKind};
+use protocol::types::{Address, Block, Hash, Receipt, SignedTransaction};
+use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::binding::store::{
     DefaultStoreArray, DefaultStoreBool, DefaultStoreMap, DefaultStoreString, DefaultStoreUint64,
 };
 
-pub struct DefalutServiceSDK<S: ServiceState, C: ChainQuerier, D: Dispatcher> {
-    state:         Rc<RefCell<S>>,
+pub struct DefaultSDKFactory<S: ServiceState, C: ChainQuerier> {
+    states:        Rc<HashMap<String, Rc<RefCell<S>>>>,
     chain_querier: Rc<C>,
-    dispatcher:    D,
 }
 
-impl<S: ServiceState, C: ChainQuerier, D: Dispatcher> DefalutServiceSDK<S, C, D> {
-    pub fn new(state: Rc<RefCell<S>>, chain_querier: Rc<C>, dispatcher: D) -> Self {
+impl<S: ServiceState, C: ChainQuerier> DefaultSDKFactory<S, C> {
+    pub fn new(states: Rc<HashMap<String, Rc<RefCell<S>>>>, chain_querier: Rc<C>) -> Self {
         Self {
-            state,
+            states,
             chain_querier,
-            dispatcher,
         }
     }
 }
 
-impl<S: 'static + ServiceState, C: ChainQuerier, D: Dispatcher> ServiceSDK
-    for DefalutServiceSDK<S, C, D>
+impl<S: 'static + ServiceState, C: ChainQuerier> SDKFactory<DefalutServiceSDK<S, C>>
+    for DefaultSDKFactory<S, C>
 {
+    fn get_sdk(&self, name: &str) -> ProtocolResult<DefalutServiceSDK<S, C>> {
+        let state = self.states.get(name).ok_or(SDKError::NotFoundService {
+            service: name.to_owned(),
+        })?;
+
+        Ok(DefalutServiceSDK::new(
+            Rc::clone(state),
+            Rc::clone(&self.chain_querier),
+        ))
+    }
+}
+
+pub struct DefalutServiceSDK<S: ServiceState, C: ChainQuerier> {
+    state:         Rc<RefCell<S>>,
+    chain_querier: Rc<C>,
+}
+
+impl<S: ServiceState, C: ChainQuerier> DefalutServiceSDK<S, C> {
+    pub fn new(state: Rc<RefCell<S>>, chain_querier: Rc<C>) -> Self {
+        Self {
+            state,
+            chain_querier,
+        }
+    }
+}
+
+impl<S: 'static + ServiceState, C: ChainQuerier> ServiceSDK for DefalutServiceSDK<S, C> {
     // Alloc or recover a `Map` by` var_name`
     fn alloc_or_recover_map<K: 'static + FixedCodec + PartialEq, V: 'static + FixedCodec>(
         &mut self,
@@ -141,55 +166,12 @@ impl<S: 'static + ServiceState, C: ChainQuerier, D: Dispatcher> ServiceSDK
             .get_receipt_by_hash(tx_hash)
             .unwrap_or_else(|e| panic!("service sdk get receipt by hash failed: {}", e))
     }
-
-    // Call other read-only methods of `service` and return the results
-    // synchronously NOTE: You can use recursive calls, but the maximum call
-    // stack is 1024
-    fn read(
-        &self,
-        ctx: &ServiceContext,
-        extra: Option<Bytes>,
-        service: &str,
-        method: &str,
-        payload: &str,
-    ) -> ServiceResponse<String> {
-        let ctx = ServiceContext::with_context(
-            ctx,
-            extra,
-            service.to_string(),
-            method.to_string(),
-            payload.to_string(),
-        );
-
-        self.dispatcher.read(ctx)
-    }
-
-    // Call other writable methods of `service` and return the results synchronously
-    // NOTE: You can use recursive calls, but the maximum call stack is 1024
-    fn write(
-        &mut self,
-        ctx: &ServiceContext,
-        extra: Option<Bytes>,
-        service: &str,
-        method: &str,
-        payload: &str,
-    ) -> ServiceResponse<String> {
-        let ctx = ServiceContext::with_context(
-            ctx,
-            extra,
-            service.to_string(),
-            method.to_string(),
-            payload.to_string(),
-        );
-
-        self.dispatcher.write(ctx)
-    }
 }
 
 #[derive(Debug, Display, From)]
 pub enum SDKError {
-    #[display(fmt = "dispatch failed: {:?}", error)]
-    DispatchFailed { error: String },
+    #[display(fmt = "service {:?} was not found", service)]
+    NotFoundService { service: String },
 }
 impl std::error::Error for SDKError {}
 

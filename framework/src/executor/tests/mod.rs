@@ -13,7 +13,9 @@ use test::Bencher;
 use asset::types::{Asset, GetBalanceResponse};
 use asset::AssetService;
 use metadata::MetadataService;
-use protocol::traits::{Executor, ExecutorParams, Service, ServiceMapping, ServiceSDK, Storage};
+use protocol::traits::{
+    Executor, ExecutorParams, SDKFactory, Service, ServiceMapping, ServiceSDK, Storage,
+};
 use protocol::types::{
     Address, Block, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
     TransactionRequest,
@@ -251,11 +253,13 @@ fn mock_signed_tx() -> SignedTransaction {
 struct MockServiceMapping;
 
 impl ServiceMapping for MockServiceMapping {
-    fn get_service<SDK: 'static + ServiceSDK>(
+    fn get_service<SDK: 'static + ServiceSDK, Factory: SDKFactory<SDK>>(
         &self,
         name: &str,
-        sdk: SDK,
+        factory: &Factory,
     ) -> ProtocolResult<Box<dyn Service>> {
+        let sdk = factory.get_sdk(name)?;
+
         let service = match name {
             "asset" => Box::new(AssetService::new(sdk)) as Box<dyn Service>,
             "metadata" => Box::new(MetadataService::new(sdk)) as Box<dyn Service>,
