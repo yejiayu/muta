@@ -294,6 +294,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let block_hash = Hash::digest(current_block.encode_fixed()?);
     let current_height = current_block.header.height;
     let exec_height = current_block.header.exec_height;
+    let proof = if let Ok(temp) = storage.get_latest_proof().await {
+        temp
+    } else {
+        current_header.proof.clone()
+    };
 
     let current_consensus_status = CurrentConsensusStatus {
         cycles_price:                metadata.cycles_price,
@@ -307,7 +312,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         list_state_root:             vec![],
         list_receipt_root:           vec![],
         list_cycles_used:            vec![],
-        current_proof:               current_header.proof.clone(),
+        current_proof:               proof,
         validators:                  validators.clone(),
         consensus_interval:          metadata.interval,
         propose_ratio:               metadata.propose_ratio,
