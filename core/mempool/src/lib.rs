@@ -12,7 +12,9 @@ pub use adapter::message::{
     RPC_PULL_TXS, RPC_PULL_TXS_SYNC, RPC_RESP_PULL_TXS, RPC_RESP_PULL_TXS_SYNC,
 };
 pub use adapter::DefaultMemPoolAdapter;
-pub use adapter::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
+pub use adapter::{
+    DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE, DEFAULT_PULL_TXS_CHUNKS_SIZE,
+};
 
 use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};

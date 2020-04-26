@@ -194,6 +194,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Arc::clone(&storage),
         config.mempool.broadcast_txs_size,
         config.mempool.broadcast_txs_interval,
+        config.mempool.pull_txs_chunks_size,
     );
     let mempool = Arc::new(HashMemPool::new(
         config.mempool.pool_size as usize,

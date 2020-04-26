@@ -4,7 +4,9 @@ use std::path::PathBuf;
 
 use serde_derive::Deserialize;
 
-use core_mempool::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
+use core_mempool::{
+    DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE, DEFAULT_PULL_TXS_CHUNKS_SIZE,
+};
 use protocol::types::Hex;
 
 #[derive(Debug, Deserialize)]
@@ -63,6 +65,10 @@ fn default_broadcast_txs_interval() -> u64 {
     DEFAULT_BROADCAST_TXS_INTERVAL
 }
 
+fn default_pull_txs_chunks_size() -> usize {
+    DEFAULT_PULL_TXS_CHUNKS_SIZE
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ConfigMempool {
     pub pool_size: u64,
@@ -71,6 +77,8 @@ pub struct ConfigMempool {
     pub broadcast_txs_size:     usize,
     #[serde(default = "default_broadcast_txs_interval")]
     pub broadcast_txs_interval: u64,
+    #[serde(default = "default_pull_txs_chunks_size")]
+    pub pull_txs_chunks_size:   usize,
 }
 
 #[derive(Debug, Deserialize)]

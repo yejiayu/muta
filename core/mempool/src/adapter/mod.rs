@@ -36,6 +36,7 @@ use crate::MemPoolError;
 
 pub const DEFAULT_BROADCAST_TXS_SIZE: usize = 200;
 pub const DEFAULT_BROADCAST_TXS_INTERVAL: u64 = 200; // milliseconds
+pub const DEFAULT_PULL_TXS_CHUNKS_SIZE: usize = 2000;
 
 struct IntervalTxsBroadcaster;
 
@@ -134,9 +135,10 @@ pub struct DefaultMemPoolAdapter<C, N, S> {
     network: N,
     storage: Arc<S>,
 
-    timeout_gap:  AtomicU64,
-    cycles_limit: AtomicU64,
-    max_tx_size:  AtomicU64,
+    timeout_gap:          AtomicU64,
+    cycles_limit:         AtomicU64,
+    max_tx_size:          AtomicU64,
+    pull_txs_chunks_size: usize,
 
     stx_tx: UnboundedSender<SignedTransaction>,
     err_rx: Mutex<UnboundedReceiver<ProtocolError>>,
@@ -155,6 +157,7 @@ where
         storage: Arc<S>,
         broadcast_txs_size: usize,
         broadcast_txs_interval: u64,
+        pull_txs_chunks_size: usize,
     ) -> Self {
         let (stx_tx, stx_rx) = unbounded();
         let (err_tx, err_rx) = unbounded();
@@ -180,6 +183,7 @@ where
             timeout_gap: AtomicU64::new(0),
             cycles_limit: AtomicU64::new(0),
             max_tx_size: AtomicU64::new(0),
+            pull_txs_chunks_size,
 
             stx_tx,
             err_rx: Mutex::new(err_rx),
@@ -201,14 +205,21 @@ where
         ctx: Context,
         tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        let pull_msg = MsgPullTxs { hashes: tx_hashes };
+        let mut txs = Vec::with_capacity(tx_hashes.len());
 
-        let resp_msg = self
-            .network
-            .call::<MsgPullTxs, MsgPushTxs>(ctx, RPC_PULL_TXS, pull_msg, Priority::High)
-            .await?;
+        for chunk_tx_hashes in tx_hashes.chunks(self.pull_txs_chunks_size) {
+            let pull_msg = MsgPullTxs {
+                hashes: chunk_tx_hashes.to_vec(),
+            };
 
-        Ok(resp_msg.sig_txs)
+            let push_txs = self
+                .network
+                .call::<MsgPullTxs, MsgPushTxs>(ctx.clone(), RPC_PULL_TXS, pull_msg, Priority::High)
+                .await?;
+            txs.extend(push_txs.sig_txs);
+        }
+
+        Ok(txs)
     }
 
     async fn pull_txs_sync(
