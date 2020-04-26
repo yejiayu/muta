@@ -52,7 +52,7 @@ pub struct ConfigConsensus {
 impl Default for ConfigConsensus {
     fn default() -> Self {
         Self {
-            sync_txs_chunk_size: 5000,
+            sync_txs_chunk_size: 1000,
         }
     }
 }
