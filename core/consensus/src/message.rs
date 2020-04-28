@@ -284,13 +284,15 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandle
     type Message = PullTxsRequest;
 
     async fn process(&self, ctx: Context, msg: PullTxsRequest) {
+        let now = std::time::Instant::now();
+        let len = msg.inner.len();
         let futs = msg
             .inner
             .into_iter()
             .map(|tx_hash| self.storage.get_transaction_by_hash(tx_hash))
             .collect::<Vec<_>>();
         let ret = try_join_all(futs).await.map(FixedSignedTxs::new);
-
+        log::error!("[push_sync_txs_from_sync]: size {:?} cost {:?}", len, now.elapsed());
         self.rpc
             .response(ctx, RPC_RESP_SYNC_PULL_TXS, ret, Priority::High)
             .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push txs {}", e))
