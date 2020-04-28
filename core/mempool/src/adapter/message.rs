@@ -148,7 +148,7 @@ where
     async fn process(&self, ctx: Context, msg: Self::Message) {
         let now = std::time::Instant::now();
         let len = msg.hashes.len();
-
+        log::info!("[push_sync_txs]: start");
         let futs = msg
             .hashes
             .into_iter()
