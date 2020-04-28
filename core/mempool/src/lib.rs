@@ -267,10 +267,10 @@ where
 
                     tokio::spawn(async move {
                         adapter.check_signature(ctx.clone(), tx.clone()).await?;
-                        adapter.check_transaction(ctx.clone(), tx.clone()).await?;
-                        adapter
-                            .check_storage_exist(ctx.clone(), tx.tx_hash.clone())
-                            .await
+                        adapter.check_transaction(ctx.clone(), tx.clone()).await
+                        // adapter
+                        //     .check_storage_exist(ctx.clone(), tx.tx_hash.clone())
+                        //     .await
                     })
                 })
                 .collect::<Vec<_>>();
