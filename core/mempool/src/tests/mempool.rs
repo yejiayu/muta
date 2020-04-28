@@ -165,8 +165,8 @@ macro_rules! ensure_order_txs {
     };
 }
 
-#[test]
-fn test_ensure_order_txs() {
+#[tokio::test(core_threads = 4)]
+async fn test_ensure_order_txs() {
     // all txs are in pool
     ensure_order_txs!(100, 0);
     // 50 txs are not in pool
@@ -220,6 +220,50 @@ fn bench_flush(b: &mut Bencher) {
         exec_flush(remove_hashes.clone(), Arc::clone(mempool));
         exec_package(Arc::clone(mempool), CYCLE_LIMIT, TX_NUM_LIMIT);
     });
+}
+
+#[tokio::test(core_threads = 4)]
+async fn bench_sign_with_spawn_list() {
+    let adapter = Arc::new(HashMemPoolAdapter::new());
+    let txs = default_mock_txs(30000);
+    let len = txs.len();
+    let now = std::time::Instant::now();
+
+    let futs = txs
+        .into_iter()
+        .map(|tx| {
+            let adapter = Arc::clone(&adapter);
+            tokio::spawn(async move {
+                adapter
+                    .check_signature(Context::new(), tx.clone())
+                    .await
+                    .unwrap();
+            })
+        })
+        .collect::<Vec<_>>();
+    futures::future::try_join_all(futs).await.unwrap();
+
+    println!(
+        "bench_sign_with_spawn_list size {:?} cost {:?}",
+        len,
+        now.elapsed()
+    );
+}
+
+#[tokio::test(core_threads = 4)]
+async fn bench_sign() {
+    let adapter = HashMemPoolAdapter::new();
+    let txs = default_mock_txs(30000);
+    let now = std::time::Instant::now();
+
+    for tx in txs.iter() {
+        adapter
+            .check_signature(Context::new(), tx.clone())
+            .await
+            .unwrap();
+    }
+
+    println!("bench_sign size {:?} cost {:?}", txs.len(), now.elapsed());
 }
 
 #[bench]

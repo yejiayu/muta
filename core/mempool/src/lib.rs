@@ -18,9 +18,12 @@ pub use adapter::{
 
 use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use derive_more::Display;
+use futures::future::try_join_all;
 use tokio::sync::RwLock;
 
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
@@ -43,12 +46,12 @@ pub struct HashMemPool<Adapter: MemPoolAdapter> {
     /// A structure for caching fresh transactions in order transaction hashes.
     callback_cache: Map<SignedTransaction>,
     /// Supply necessary functions from outer modules.
-    adapter:        Adapter,
+    adapter:        Arc<Adapter>,
     /// exclusive flush_memory and insert_tx to avoid repeat txs insertion.
     flush_lock:     RwLock<()>,
 }
 
-impl<Adapter> HashMemPool<Adapter>
+impl<Adapter: 'static> HashMemPool<Adapter>
 where
     Adapter: MemPoolAdapter,
 {
@@ -58,7 +61,7 @@ where
             timeout_gap: AtomicU64::new(0),
             tx_cache: TxCache::new(pool_size * 2),
             callback_cache: Map::new(pool_size),
-            adapter,
+            adapter: Arc::new(adapter),
             flush_lock: RwLock::new(()),
         }
     }
@@ -114,10 +117,50 @@ where
 
         Ok(())
     }
+
+    async fn verify_tx_in_parallel(
+        &self,
+        ctx: Context,
+        txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()> {
+        let now = Instant::now();
+        let len = txs.len();
+
+        let futs = txs
+            .into_iter()
+            .map(|signed_tx| {
+                let adapter = Arc::clone(&self.adapter);
+                let ctx = ctx.clone();
+
+                tokio::spawn(async move {
+                    adapter
+                        .check_signature(ctx.clone(), signed_tx.clone())
+                        .await?;
+                    adapter
+                        .check_transaction(ctx.clone(), signed_tx.clone())
+                        .await?;
+                    adapter
+                        .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
+                        .await
+                })
+            })
+            .collect::<Vec<_>>();
+        try_join_all(futs).await.map_err(|e| {
+            log::error!("[mempool] verify batch txs error {:?}", e);
+            MemPoolError::VerifyBatchTransactions
+        })?;
+
+        log::info!(
+            "[mempool] verify txs done, size {:?} cost {:?}",
+            len,
+            now.elapsed()
+        );
+        Ok(())
+    }
 }
 
 #[async_trait]
-impl<Adapter> MemPool for HashMemPool<Adapter>
+impl<Adapter: 'static> MemPool for HashMemPool<Adapter>
 where
     Adapter: MemPoolAdapter,
 {
@@ -208,16 +251,8 @@ where
                 .into());
             }
 
+            self.verify_tx_in_parallel(ctx.clone(), txs.clone()).await?;
             for signed_tx in txs.into_iter() {
-                self.adapter
-                    .check_signature(ctx.clone(), signed_tx.clone())
-                    .await?;
-                self.adapter
-                    .check_transaction(ctx.clone(), signed_tx.clone())
-                    .await?;
-                self.adapter
-                    .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
-                    .await?;
                 self.callback_cache
                     .insert(signed_tx.tx_hash.clone(), signed_tx);
             }
@@ -231,21 +266,7 @@ where
         ctx: Context,
         order_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
-        for signed_tx in order_txs.into_iter() {
-            self.adapter
-                .check_signature(ctx.clone(), signed_tx.clone())
-                .await?;
-            self.adapter
-                .check_transaction(ctx.clone(), signed_tx.clone())
-                .await?;
-            self.adapter
-                .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
-                .await?;
-            self.callback_cache
-                .insert(signed_tx.tx_hash.clone(), signed_tx);
-        }
-
-        Ok(())
+        self.verify_tx_in_parallel(ctx, order_txs).await
     }
 
     async fn sync_propose_txs(
@@ -339,6 +360,9 @@ pub enum MemPoolError {
 
     #[display(fmt = "Tx: {:?} invalid timeout", tx_hash)]
     InvalidTimeout { tx_hash: Hash },
+
+    #[display(fmt = "Batch transaction validation failed")]
+    VerifyBatchTransactions,
 }
 
 impl Error for MemPoolError {}
