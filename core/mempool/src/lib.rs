@@ -1,4 +1,5 @@
 #![feature(test)]
+#![feature(async_closure)]
 
 mod adapter;
 mod context;
@@ -18,9 +19,11 @@ pub use adapter::{
 
 use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use derive_more::Display;
+use futures::future::try_join_all;
 use tokio::sync::RwLock;
 
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
@@ -43,7 +46,7 @@ pub struct HashMemPool<Adapter: MemPoolAdapter> {
     /// A structure for caching fresh transactions in order transaction hashes.
     callback_cache: Map<SignedTransaction>,
     /// Supply necessary functions from outer modules.
-    adapter:        Adapter,
+    adapter:        Arc<Adapter>,
     /// exclusive flush_memory and insert_tx to avoid repeat txs insertion.
     flush_lock:     RwLock<()>,
 }
@@ -58,7 +61,7 @@ where
             timeout_gap: AtomicU64::new(0),
             tx_cache: TxCache::new(pool_size * 2),
             callback_cache: Map::new(pool_size),
-            adapter,
+            adapter: Arc::new(adapter),
             flush_lock: RwLock::new(()),
         }
     }
@@ -117,7 +120,7 @@ where
 }
 
 #[async_trait]
-impl<Adapter> MemPool for HashMemPool<Adapter>
+impl<Adapter: 'static> MemPool for HashMemPool<Adapter>
 where
     Adapter: MemPoolAdapter,
 {
@@ -240,7 +243,11 @@ where
                 .pull_txs_sync(ctx.clone(), unknown_hashes)
                 .await?;
             let len = txs.len();
-            log::error!("[ensure_order_txs_sync] pull size{:?} len {:?}", len, now.elapsed());
+            log::error!(
+                "[ensure_order_txs_sync] pull size{:?} len {:?}",
+                len,
+                now.elapsed()
+            );
             // Make sure response signed_txs is the same size of request hashes.
             if txs.len() != unknown_len {
                 return Err(MemPoolError::EnsureBreak {
@@ -252,20 +259,31 @@ where
 
             let now = std::time::Instant::now();
             log::error!("[ensure_order_txs_sync] start verify");
-            for signed_tx in txs.into_iter() {
-                self.adapter
-                    .check_signature(ctx.clone(), signed_tx.clone())
-                    .await?;
-                self.adapter
-                    .check_transaction(ctx.clone(), signed_tx.clone())
-                    .await?;
-                self.adapter
-                    .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
-                    .await?;
-                self.callback_cache
-                    .insert(signed_tx.tx_hash.clone(), signed_tx);
-            }
-            log::error!("[ensure_order_txs_sync] verify size{:?} len {:?}", len, now.elapsed());
+            let futs = txs
+                .into_iter()
+                .map(|tx| {
+                    let adapter = Arc::clone(&self.adapter);
+                    let ctx = ctx.clone();
+
+                    tokio::spawn(async move {
+                        adapter.check_signature(ctx.clone(), tx.clone()).await?;
+                        adapter.check_transaction(ctx.clone(), tx.clone()).await?;
+                        adapter
+                            .check_storage_exist(ctx.clone(), tx.tx_hash.clone())
+                            .await
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            try_join_all(futs).await.map_err(|e| {
+                log::error!("[mempool] verify sync txs error {:?}", e);
+                MemPoolError::VerifyBatch
+            })?;
+            log::error!(
+                "[ensure_order_txs_sync] verify size{:?} len {:?}",
+                len,
+                now.elapsed()
+            );
         }
 
         Ok(())
@@ -362,6 +380,9 @@ pub enum MemPoolError {
 
     #[display(fmt = "Tx: {:?} invalid timeout", tx_hash)]
     InvalidTimeout { tx_hash: Hash },
+
+    #[display(fmt = "Batch transaction validation failed")]
+    VerifyBatch,
 }
 
 impl Error for MemPoolError {}

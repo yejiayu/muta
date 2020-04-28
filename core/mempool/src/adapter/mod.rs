@@ -271,72 +271,72 @@ where
     // TODO: Cycle limit?
     async fn check_transaction(&self, _ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
         // Verify transaction hash
-        // let fixed_bytes = stx.raw.encode_fixed()?;
-        // let size = fixed_bytes.len() as u64;
-        // let tx_hash = Hash::digest(fixed_bytes);
+        let fixed_bytes = stx.raw.encode_fixed()?;
+        let size = fixed_bytes.len() as u64;
+        let tx_hash = Hash::digest(fixed_bytes);
 
-        // if tx_hash != stx.tx_hash {
-        //     let wrong_hash = MemPoolError::CheckHash {
-        //         expect: stx.tx_hash,
-        //         actual: tx_hash,
-        //     };
+        if tx_hash != stx.tx_hash {
+            let wrong_hash = MemPoolError::CheckHash {
+                expect: stx.tx_hash,
+                actual: tx_hash,
+            };
 
-        //     return Err(wrong_hash.into());
-        // }
+            return Err(wrong_hash.into());
+        }
 
-        // // check tx size
-        // let max_tx_size = self.max_tx_size.load(Ordering::SeqCst);
-        // if size > max_tx_size {
-        //     return Err(MemPoolError::ExceedSizeLimit {
-        //         tx_hash,
-        //         max_tx_size,
-        //         size,
-        //     }
-        //     .into());
-        // }
+        // check tx size
+        let max_tx_size = self.max_tx_size.load(Ordering::SeqCst);
+        if size > max_tx_size {
+            return Err(MemPoolError::ExceedSizeLimit {
+                tx_hash,
+                max_tx_size,
+                size,
+            }
+            .into());
+        }
 
-        // // check cycle limit
-        // let cycles_limit_config = self.cycles_limit.load(Ordering::SeqCst);
-        // let cycles_limit_tx = stx.raw.cycles_limit;
-        // if cycles_limit_tx > cycles_limit_config {
-        //     return Err(MemPoolError::ExceedCyclesLimit {
-        //         tx_hash,
-        //         cycles_limit_tx,
-        //         cycles_limit_config,
-        //     }
-        //     .into());
-        // }
+        // check cycle limit
+        let cycles_limit_config = self.cycles_limit.load(Ordering::SeqCst);
+        let cycles_limit_tx = stx.raw.cycles_limit;
+        if cycles_limit_tx > cycles_limit_config {
+            return Err(MemPoolError::ExceedCyclesLimit {
+                tx_hash,
+                cycles_limit_tx,
+                cycles_limit_config,
+            }
+            .into());
+        }
 
-        // // Verify chain id
-        // let latest_block = self.storage.get_latest_block().await?;
-        // if latest_block.header.chain_id != stx.raw.chain_id {
-        //     let wrong_chain_id = MemPoolError::WrongChain {
-        //         tx_hash: stx.tx_hash,
-        //     };
+        // Verify chain id
+        let latest_block = self.storage.get_latest_block().await?;
+        if latest_block.header.chain_id != stx.raw.chain_id {
+            let wrong_chain_id = MemPoolError::WrongChain {
+                tx_hash: stx.tx_hash,
+            };
 
-        //     return Err(wrong_chain_id.into());
-        // }
+            return Err(wrong_chain_id.into());
+        }
 
-        // // Verify timeout
-        // let latest_height = latest_block.header.height;
-        // let timeout_gap = self.timeout_gap.load(Ordering::SeqCst);
+        // Verify timeout
+        let latest_height = latest_block.header.height;
+        let timeout_gap = self.timeout_gap.load(Ordering::SeqCst);
 
-        // if stx.raw.timeout > latest_height + timeout_gap {
-        //     let invalid_timeout = MemPoolError::InvalidTimeout {
-        //         tx_hash: stx.tx_hash,
-        //     };
+        if stx.raw.timeout > latest_height + timeout_gap {
+            let invalid_timeout = MemPoolError::InvalidTimeout {
+                tx_hash: stx.tx_hash,
+            };
 
-        //     return Err(invalid_timeout.into());
-        // }
+            return Err(invalid_timeout.into());
+        }
 
-        // if stx.raw.timeout < latest_height {
-        //     let timeout = MemPoolError::Timeout {
-        //         tx_hash: stx.tx_hash,
-        //         timeout: stx.raw.timeout,
-        //     };
+        if stx.raw.timeout < latest_height {
+            let timeout = MemPoolError::Timeout {
+                tx_hash: stx.tx_hash,
+                timeout: stx.raw.timeout,
+            };
 
-        //     return Err(timeout.into());
-        // }
+            return Err(timeout.into());
+        }
 
         Ok(())
     }

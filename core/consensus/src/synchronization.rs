@@ -374,7 +374,12 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
                 .adapter
                 .get_txs_from_remote(ctx.clone(), &tx_hashes)
                 .await?;
-            log::error!("[sync_pull_tx]  size {:?} costs {:?} {:?}", remote_txs.len(), now.elapsed(), txs.len());
+            log::error!(
+                "[sync_pull_tx]  size {:?} costs {:?} {:?}",
+                remote_txs.len(),
+                now.elapsed(),
+                txs.len()
+            );
             txs.extend(remote_txs);
         }
 

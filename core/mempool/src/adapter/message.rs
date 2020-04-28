@@ -149,7 +149,11 @@ where
         let now = std::time::Instant::now();
         let len = msg.hashes.len();
         log::error!("[push_sync_txs]: start");
-        let ret = self.storage.get_transactions(msg.hashes).await.map(|sig_txs| MsgPushTxs { sig_txs });
+        let ret = self
+            .storage
+            .get_transactions(msg.hashes)
+            .await
+            .map(|sig_txs| MsgPushTxs { sig_txs });
         // let ret = MsgPushTxs { sig_txs};
         // let futs = msg
         //     .hashes
