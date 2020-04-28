@@ -234,10 +234,13 @@ where
         let unknown_hashes = self.show_unknown_txs(order_tx_hashes);
         if !unknown_hashes.is_empty() {
             let unknown_len = unknown_hashes.len();
+            let now = std::time::Instant::now();
             let txs = self
                 .adapter
                 .pull_txs_sync(ctx.clone(), unknown_hashes)
                 .await?;
+            let len = txs.len();
+            log::error!("[ensure_order_txs_sync] pull size{:?} len {:?}", len, now.elapsed());
             // Make sure response signed_txs is the same size of request hashes.
             if txs.len() != unknown_len {
                 return Err(MemPoolError::EnsureBreak {
@@ -247,6 +250,8 @@ where
                 .into());
             }
 
+            let now = std::time::Instant::now();
+            log::error!("[ensure_order_txs_sync] start verify");
             for signed_tx in txs.into_iter() {
                 self.adapter
                     .check_signature(ctx.clone(), signed_tx.clone())
@@ -260,6 +265,7 @@ where
                 self.callback_cache
                     .insert(signed_tx.tx_hash.clone(), signed_tx);
             }
+            log::error!("[ensure_order_txs_sync] verify size{:?} len {:?}", len, now.elapsed());
         }
 
         Ok(())
