@@ -135,10 +135,10 @@ where
                 tokio::spawn(async move {
                     adapter
                         .check_signature(ctx.clone(), signed_tx.clone())
+                        .await?;
+                    adapter
+                        .check_transaction(ctx.clone(), signed_tx.clone())
                         .await
-                    // adapter
-                    //     .check_transaction(ctx.clone(), signed_tx.clone())
-                    //     .await
                     // adapter
                     //     .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
                     //     .await
