@@ -369,11 +369,12 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         let mut txs = Vec::with_capacity(block.ordered_tx_hashes.len());
 
         for tx_hashes in block.ordered_tx_hashes.chunks(self.sync_txs_chunk_size) {
+            let now = std::time::Instant::now();
             let remote_txs = self
                 .adapter
                 .get_txs_from_remote(ctx.clone(), &tx_hashes)
                 .await?;
-
+            log::error!("[sync_pull_tx]  size {:?} costs {:?}", remote_txs.len(), now.elapsed());
             txs.extend(remote_txs);
         }
 
