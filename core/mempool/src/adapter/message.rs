@@ -148,7 +148,7 @@ where
     async fn process(&self, ctx: Context, msg: Self::Message) {
         let now = std::time::Instant::now();
         let len = msg.hashes.len();
-        log::info!("[push_sync_txs]: start");
+        log::error!("[push_sync_txs]: start");
         let futs = msg
             .hashes
             .into_iter()
@@ -157,7 +157,7 @@ where
         let ret = try_join_all(futs)
             .await
             .map(|sig_txs| MsgPushTxs { sig_txs });
-        log::info!("[push_sync_txs]: size {:?} cost {:?}", len, now.elapsed());
+        log::error!("[push_sync_txs]: size {:?} cost {:?}", len, now.elapsed());
         self.network
             .response(ctx, RPC_RESP_PULL_TXS_SYNC, ret, Priority::High)
             .unwrap_or_else(move |e| log::warn!("[core_mempool] push txs {}", e))
