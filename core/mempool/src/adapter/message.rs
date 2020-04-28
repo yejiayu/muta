@@ -149,14 +149,16 @@ where
         let now = std::time::Instant::now();
         let len = msg.hashes.len();
         log::error!("[push_sync_txs]: start");
-        let futs = msg
-            .hashes
-            .into_iter()
-            .map(|tx_hash| self.storage.get_transaction_by_hash(tx_hash))
-            .collect::<Vec<_>>();
-        let ret = try_join_all(futs)
-            .await
-            .map(|sig_txs| MsgPushTxs { sig_txs });
+        let ret = self.storage.get_transactions(msg.hashes).await.map(|sig_txs| MsgPushTxs { sig_txs });
+        // let ret = MsgPushTxs { sig_txs};
+        // let futs = msg
+        //     .hashes
+        //     .into_iter()
+        //     .map(|tx_hash| self.storage.get_transaction_by_hash(tx_hash))
+        //     .collect::<Vec<_>>();
+        // let ret = try_join_all(futs)
+        //     .await
+        //     .map(|sig_txs| MsgPushTxs { sig_txs });
         log::error!("[push_sync_txs]: size {:?} cost {:?}", len, now.elapsed());
         self.network
             .response(ctx, RPC_RESP_PULL_TXS_SYNC, ret, Priority::High)
