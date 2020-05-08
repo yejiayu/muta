@@ -390,6 +390,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         old_validators.sort();
         Ok(old_validators)
     }
+
+    fn report_error(&self, _: Context, _: overlord::error::ConsensusError) {}
 }
 
 #[async_trait]
