@@ -45,6 +45,11 @@ rand = "0.7"
 cita_trie = "2.0"
 core-network = { path = "./core/network", features = ["diagnostic"] }
 
+[dev-dependencies.cargo-husky]
+version = "1"
+default-features = false # Disable features which are enabled by default
+features = ["precommit-hook"]
+
 [workspace]
 members = [
   "devtools/keypair",
