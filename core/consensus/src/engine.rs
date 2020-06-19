@@ -843,7 +843,7 @@ fn metrics_view_change(
             continue;
         }
 
-        let leader_address = get_leader(height, round, authority_list.clone());
+        let leader_address = get_leader(height, view_change_round, authority_list.clone());
         let leader_address = Address::from_bytes(leader_address)?;
 
         if self_address == leader_address {
