@@ -846,6 +846,13 @@ fn metrics_view_change(
         let leader_address = get_leader(height, view_change_round, authority_list.clone());
         let leader_address = Address::from_bytes(leader_address)?;
 
+        log::info!(
+            "[consensus] leader address {:?} self address {:?} height {:?} round {:?}",
+            leader_address,
+            self_address,
+            height,
+            round
+        );
         if self_address == leader_address {
             common_apm::metrics::consensus::VIEW_CHANGE_TOTAL.inc_by(1);
         }
