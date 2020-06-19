@@ -81,6 +81,11 @@ lazy_static! {
         "The counter for sync blocks from remote"
     )
     .unwrap();
+    pub static ref VIEW_CHANGE_TOTAL: IntCounter = register_int_counter!(
+        "muta_consensus_view_change_total",
+        "The leader didn't succeed"
+    )
+    .unwrap();
     pub static ref ENGINE_SYNC_BLOCK_HISTOGRAM: Histogram = register_histogram!(
         "muta_consensus_sync_block_duration",
         "Histogram of consensus sync duration",

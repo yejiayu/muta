@@ -10,7 +10,7 @@ use futures_timer::Delay;
 use log::error;
 use overlord::error::ConsensusError as OverlordError;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
-use overlord::{Consensus as Engine, DurationConfig, Wal};
+use overlord::{get_leader, Consensus as Engine, DurationConfig, Wal};
 use parking_lot::RwLock;
 use rlp::Encodable;
 
@@ -379,7 +379,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             metadata.verifier_list
         );
 
-        self.update_status(metadata, pill.block, proof, signed_txs)
+        self.update_status(metadata, pill.block, proof.clone(), signed_txs)
             .await?;
 
         self.adapter
@@ -395,6 +395,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         set.clear();
 
         let current_consensus_status = self.status_agent.to_inner();
+
+        let validatores = current_consensus_status.validators.clone();
+        let self_address = self.node_info.self_address.clone();
+
+        metrics_view_change(proof.height, proof.round, self_address, validatores)?;
+
         let status = Status {
             height:         current_height + 1,
             interval:       Some(current_consensus_status.consensus_interval),
@@ -416,6 +422,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         common_apm::metrics::consensus::ENGINE_CONSENSUS_COST_TIME.observe(elapsed / 1e3);
         let mut last_commit_time = self.last_commit_time.write();
         *last_commit_time = now;
+
         Ok(status)
     }
 
@@ -814,4 +821,35 @@ async fn sync_txs<CA: ConsensusAdapter>(
     propose_hashes: Vec<Hash>,
 ) -> ProtocolResult<()> {
     adapter.sync_txs(ctx, propose_hashes).await
+}
+
+fn metrics_view_change(
+    height: u64,
+    round: u64,
+    self_address: Address,
+    validators: Vec<Validator>,
+) -> ProtocolResult<()> {
+    let authority_list = validators
+        .into_iter()
+        .map(|v| Node {
+            address:        v.address.as_bytes(),
+            propose_weight: v.propose_weight,
+            vote_weight:    v.vote_weight,
+        })
+        .collect::<Vec<_>>();
+
+    for view_change_round in 0..round {
+        if view_change_round == 0 {
+            continue;
+        }
+
+        let leader_address = get_leader(height, round, authority_list.clone());
+        let leader_address = Address::from_bytes(leader_address)?;
+
+        if self_address == leader_address {
+            common_apm::metrics::consensus::VIEW_CHANGE_TOTAL.inc_by(1);
+        }
+    }
+
+    Ok(())
 }
