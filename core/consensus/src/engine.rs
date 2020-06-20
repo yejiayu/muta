@@ -829,6 +829,10 @@ fn metrics_view_change(
     self_address: Address,
     validators: Vec<Validator>,
 ) -> ProtocolResult<()> {
+    if round == 0 {
+        return Ok(());
+    }
+
     let authority_list = validators
         .into_iter()
         .map(|v| Node {
@@ -839,10 +843,6 @@ fn metrics_view_change(
         .collect::<Vec<_>>();
 
     for view_change_round in 0..round {
-        if view_change_round == 0 {
-            continue;
-        }
-
         let leader_address = get_leader(height, view_change_round, authority_list.clone());
         let leader_address = Address::from_bytes(leader_address)?;
 
@@ -851,7 +851,7 @@ fn metrics_view_change(
             leader_address,
             self_address,
             height,
-            round
+            view_change_round
         );
         if self_address == leader_address {
             common_apm::metrics::consensus::VIEW_CHANGE_TOTAL.inc_by(1);
