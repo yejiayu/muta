@@ -64,7 +64,7 @@ e2e-test:
 
 e2e-test-via-docker:
 	docker-compose -f tests/e2e/docker-compose-e2e-test.yaml up --exit-code-from e2e-test --force-recreate
-
+#
 # For counting lines of code
 stats:
 	@cargo count --version || cargo +nightly install --git https://github.com/kbknapp/cargo-count
